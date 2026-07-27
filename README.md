@@ -136,7 +136,7 @@ Create it once at startup:
 ```go
 wl, err := wirelog.New(ctx, os.Getenv(wirelog.EnvDatabaseURL), // "WIRELOG_DATABASE_URL"
     wirelog.WithDefaultConsumer("payments-api"), // stamped on every record
-    wirelog.WithLogger(myLogger),                // receives one line per failed insert
+    wirelog.WithLogger(myLogger),                // startup connection status, then one line per failed insert
     wirelog.WithAutoMigrate(false),              // apply the DDL yourself in prod (default false)
 )
 if err != nil {
@@ -294,7 +294,7 @@ The error string is stored in the `error` column for the failure paths.
 | `WithBuffer(n)` | 2048 | enqueue channel capacity; a full buffer drops records (counted in `Dropped`) |
 | `WithBatchSize(n)` | 100 | records per multi-row INSERT |
 | `WithFlushInterval(d)` | 2s | flush cadence for partial batches |
-| `WithLogger(l)` | silent no-op | receives one line per failed batch insert |
+| `WithLogger(l)` | silent no-op | one line for startup connection status (success or failure), then one per failed batch insert |
 | `WithAutoMigrate(b)` | false | apply the embedded DDL during `New` |
 | `WithDefaultConsumer(c)` | "" | consumer stamped on every record unless overridden |
 

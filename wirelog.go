@@ -6,9 +6,11 @@ package wirelog
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -16,6 +18,9 @@ import (
 
 // EnvDatabaseURL is the conventional environment variable holding the wirelog Postgres DSN.
 const EnvDatabaseURL = "WIRELOG_DATABASE_URL"
+
+// connectTimeout bounds the startup database connectivity check.
+const connectTimeout = 5 * time.Second
 
 // Wirelog owns the record queue, the single writer goroutine, and the pgx pool.
 type Wirelog struct {
@@ -38,6 +43,8 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Wirelog, error) {
 	if err != nil {
 		return nil, err
 	}
+	// pgxpool dials lazily, so ping once here to surface the target and network path in logs; never fatal
+	logConnectionStatus(ctx, pool, o.logger)
 	if o.autoMigrate {
 		if err := migrate(ctx, pool); err != nil {
 			pool.Close()
@@ -48,6 +55,21 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Wirelog, error) {
 	wl.w = newWriter(wl.ch, &pgInserter{pool: pool}, o.batchSize, o.flushInterval, o.logger, &wl.dropped)
 	go wl.w.run()
 	return wl, nil
+}
+
+// logConnectionStatus pings the pool once and logs the outcome with the target host, port and database — never the credentials.
+func logConnectionStatus(ctx context.Context, pool *pgxpool.Pool, log Logger) {
+	connConfig := pool.Config().ConnConfig
+	target := fmt.Sprintf("%s:%d/%s", connConfig.Host, connConfig.Port, connConfig.Database)
+
+	pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
+	defer cancel()
+
+	if err := pool.Ping(pingCtx); err != nil {
+		log.Printf("wirelog: database connection failed for %s: %v", target, err)
+		return
+	}
+	log.Printf("wirelog: database connection successful for %s", target)
 }
 
 // Close drains the queue, performs a final flush, then closes the pool.

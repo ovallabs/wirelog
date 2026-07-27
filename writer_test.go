@@ -168,7 +168,9 @@ func TestBuildInsertPlaceholdersAndNullMapping(t *testing.T) {
 	if got := strings.Count(sql, "$"); got != 2*colCount {
 		t.Errorf("placeholder count = %d, want %d", got, 2*colCount)
 	}
-	if !strings.Contains(sql, "$40") || strings.Contains(sql, "$41") {
+	lastPlaceholder := fmt.Sprintf("$%d", 2*colCount)
+	pastEndPlaceholder := fmt.Sprintf("$%d", 2*colCount+1)
+	if !strings.Contains(sql, lastPlaceholder) || strings.Contains(sql, pastEndPlaceholder) {
 		t.Error("placeholders must be numbered continuously across rows")
 	}
 	if got := strings.Count(sql, "::jsonb"); got != 10 {

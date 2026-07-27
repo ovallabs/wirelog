@@ -52,6 +52,12 @@ func WithExtraDenyHeaders(h ...string) ConfigOption {
 	return func(c *Config) { c.DenyHeaders = append(c.DenyHeaders, h...) }
 }
 
+// WithResultExtractor sets the provider's own failure check, for APIs that
+// answer 2xx and report errors in the response body.
+func WithResultExtractor(e ResultExtractor) ConfigOption {
+	return func(c *Config) { c.ResultExtractor = e }
+}
+
 // WithExtraExcludePaths appends paths that produce no record at all.
 func WithExtraExcludePaths(p ...string) ConfigOption {
 	return func(c *Config) { c.ExcludePaths = append(c.ExcludePaths, p...) }

@@ -85,8 +85,8 @@ func TestBuildRecordSuccessFields(t *testing.T) {
 	if rec.path != "/v1/transfers/12345" {
 		t.Errorf("path = %q, want raw /v1/transfers/12345", rec.path)
 	}
-	if rec.endpoint != "/v1/transfers/{id}" {
-		t.Errorf("endpoint = %q, want normalized /v1/transfers/{id}", rec.endpoint)
+	if rec.endpoint != "magma/v1/transfers/{id}" {
+		t.Errorf("endpoint = %q, want host + normalized magma/v1/transfers/{id}", rec.endpoint)
 	}
 	if rec.method != http.MethodPost || rec.statusCode != 200 || rec.outcome != outcomeSuccess {
 		t.Errorf("method/status/outcome = %q/%d/%q", rec.method, rec.statusCode, rec.outcome)

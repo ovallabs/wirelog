@@ -77,7 +77,7 @@ func (c *capture) buildRecord(x exchange) record {
 		provider:       c.cfg.Provider,
 		consumer:       resolveConsumer(ctx, c.cfg.Consumer, c.consumer),
 		operation:      string(operationFrom(ctx)),
-		endpoint:       c.cfg.PathNormalizer(x.req.URL.Path),
+		endpoint:       x.req.URL.Host + c.cfg.PathNormalizer(x.req.URL.Path),
 		path:           x.req.URL.Path,
 		method:         x.req.Method,
 		remoteIP:       x.remoteIP,

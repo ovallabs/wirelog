@@ -198,7 +198,7 @@ was made. Attach that through the request context and it lands in the record:
 
 ```go
 ctx = wirelog.WithRef(ctx, "PYT-2026-0001")             // your internal reference
-ctx = wirelog.WithOperation(ctx, "payout.execute")      // business operation
+ctx = wirelog.WithOperation(ctx, wirelog.OperationPayout) // what this call does
 ctx = wirelog.WithIdempotencyKey(ctx, "idem-0001")
 ctx = wirelog.WithConsumer(ctx, "checkout")             // overrides the instance default
 ctx = wirelog.WithTags(ctx, map[string]any{"batch": "b-42"}) // merges across calls
@@ -209,6 +209,29 @@ resp, err := client.Do(req)
 Consumer precedence is `WithConsumer(ctx)` > `Config.Consumer` >
 `WithDefaultConsumer`. `WithTags` shallow-merges across calls (last write wins
 per key); repeated `WithOperation` — last wins.
+
+#### Operations are a shared vocabulary
+
+`Operation` is a canonical enum, not free text, so `operation` means the same
+thing across every provider and one query spans them all:
+
+| Constant | Value |
+|---|---|
+| `OperationBalanceCheck` | `balance_check` |
+| `OperationPayout` | `payout` |
+| `OperationCollection` | `collection` |
+| `OperationRefund` | `refund` |
+| `OperationAccountVerification` | `account_verification` |
+| `OperationStatusCheck` | `status_check` |
+| `OperationTransactionHistory` | `transaction_history` |
+| `OperationMethodsLookup` | `methods_lookup` |
+| `OperationExchangeRate` | `exchange_rate` |
+
+Set it **per call**, at the point that knows which call it is — usually inside
+the provider SDK method, not once per business flow. A single annotation set
+upstream applies to *every* call made under that context, so a balance check and
+a payout would both be labelled the same. Business classification that spans a
+whole flow belongs in `WithTags` instead.
 
 ### 5. Shut down cleanly
 
@@ -313,8 +336,14 @@ Path options match as **substrings of `req.URL.Path`** only, never the query
 string. Substring means `/auth` also matches `/authors` — narrow the needle with
 a trailing slash or a more specific fragment when needed. `MaxBodyBytes` defaults
 to 16384; a nil `PathNormalizer` falls back to `DefaultNormalizer`, which
-collapses UUID, all-numeric, and long-hex path segments to `{id}` (so
-`/users/123` files under the endpoint `/users/{id}`).
+collapses UUID, all-numeric, and long-hex path segments to `{id}`.
+
+`endpoint` is the request host followed by that normalized path, so
+`https://api.example.com/users/123` files under
+`api.example.com/users/{id}`. Including the host means a record identifies
+which base URL was actually hit — sandbox versus production, or one regional
+endpoint versus another — while still grouping cleanly by route. `path` stays
+the raw path on its own.
 
 `EnvDatabaseURL` is the conventional env var name (`WIRELOG_DATABASE_URL`) for
 the DSN, so services reference it instead of hardcoding.
@@ -331,7 +360,7 @@ as a migration in prod (the app's DB role then needs only `INSERT`).
 |---|---|
 | `id`, `created_at` | identity PK, insert timestamp |
 | `provider`, `consumer`, `operation` | who called, on whose behalf, doing what |
-| `endpoint`, `path`, `method` | normalized endpoint, raw path, HTTP method |
+| `endpoint`, `path`, `method` | host + normalized route, raw path, HTTP method |
 | `remote_ip` | resolved provider IP; NULL if the connection never established |
 | `status_code`, `outcome`, `error` | status (NULL on transport error), classification, error string |
 | `latency_ms`, `request_size`, `response_size` | timing and byte sizes (always recorded, even with bodies off) |

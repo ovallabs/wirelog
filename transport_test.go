@@ -80,8 +80,9 @@ func TestRoundTripFullRecordOnSuccess(t *testing.T) {
 	if rec.operation != "payout.execute" || rec.internalRef != "ref-1" || rec.idempotencyKey != "idem-1" {
 		t.Errorf("annotations lost: %+v", rec)
 	}
-	if rec.path != "/v1/transfers/12345" || rec.endpoint != "/v1/transfers/{id}" {
-		t.Errorf("path/endpoint = %q/%q", rec.path, rec.endpoint)
+	wantEndpoint := strings.TrimPrefix(srv.URL, "http://") + "/v1/transfers/{id}"
+	if rec.path != "/v1/transfers/12345" || rec.endpoint != wantEndpoint {
+		t.Errorf("path/endpoint = %q/%q, want endpoint %q", rec.path, rec.endpoint, wantEndpoint)
 	}
 	if rec.method != http.MethodPost || rec.statusCode != 200 || rec.outcome != outcomeSuccess {
 		t.Errorf("method/status/outcome = %q/%d/%q", rec.method, rec.statusCode, rec.outcome)

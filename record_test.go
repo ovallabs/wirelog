@@ -216,3 +216,108 @@ func TestResponseSizeFallbacks(t *testing.T) {
 		t.Errorf("nil response = %d, want 0", got)
 	}
 }
+
+// TestBuildRecordResultExtractorOverridesOutcome checks a provider that answers
+// 2xx with an error envelope is recorded as a failure carrying its message.
+func TestBuildRecordResultExtractorOverridesOutcome(t *testing.T) {
+	extractor := func(_ int, body []byte) (bool, string) {
+		var envelope struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(body, &envelope) != nil || envelope.Code < 400 {
+			return false, ""
+		}
+		return true, envelope.Message
+	}
+	c := newCapture(NewConfig("magma", WithCaptureBodies(true), WithResultExtractor(extractor)), "inst")
+
+	req, err := http.NewRequest(http.MethodPost, "http://magma/v1/payout/transfer", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}}
+
+	t.Run("error envelope under 200 becomes provider_error", func(t *testing.T) {
+		body := []byte(`{"code":422,"message":"This corridor is currently not available"}`)
+		rec := c.buildRecord(exchange{req: req, resp: resp, respBody: body})
+		if rec.outcome != outcomeProviderError {
+			t.Errorf("outcome = %q, want provider_error despite HTTP 200", rec.outcome)
+		}
+		if rec.callErr != "This corridor is currently not available" {
+			t.Errorf("callErr = %q, want the provider message", rec.callErr)
+		}
+		if rec.statusCode != 200 {
+			t.Errorf("statusCode = %d, want the real HTTP status preserved", rec.statusCode)
+		}
+	})
+
+	t.Run("success envelope stays success", func(t *testing.T) {
+		rec := c.buildRecord(exchange{req: req, resp: resp, respBody: []byte(`{"code":200,"message":"OK"}`)})
+		if rec.outcome != outcomeSuccess || rec.callErr != "" {
+			t.Errorf("outcome/callErr = %q/%q, want success and no error", rec.outcome, rec.callErr)
+		}
+	})
+
+	t.Run("unparseable body leaves outcome untouched", func(t *testing.T) {
+		rec := c.buildRecord(exchange{req: req, resp: resp, respBody: []byte(`<html>nope</html>`)})
+		if rec.outcome != outcomeSuccess || rec.callErr != "" {
+			t.Errorf("outcome/callErr = %q/%q, want success when the envelope cannot be read", rec.outcome, rec.callErr)
+		}
+	})
+
+	t.Run("nil body when capture is off", func(t *testing.T) {
+		rec := c.buildRecord(exchange{req: req, resp: resp})
+		if rec.outcome != outcomeSuccess {
+			t.Errorf("outcome = %q, want success with no body to inspect", rec.outcome)
+		}
+	})
+}
+
+// TestBuildRecordResultExtractorSkippedOnTransportError checks the transport
+// error wins and the extractor never runs without a response.
+func TestBuildRecordResultExtractorSkippedOnTransportError(t *testing.T) {
+	called := false
+	extractor := func(int, []byte) (bool, string) {
+		called = true
+		return true, "should never be used"
+	}
+	c := newCapture(NewConfig("magma", WithResultExtractor(extractor)), "inst")
+
+	req, err := http.NewRequest(http.MethodGet, "http://magma/v1/misc/balance", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := c.buildRecord(exchange{req: req, err: errors.New("dial tcp: connection refused")})
+
+	if called {
+		t.Error("ResultExtractor ran on the transport error path; there is no response to classify")
+	}
+	if rec.outcome != outcomeNetwork {
+		t.Errorf("outcome = %q, want network", rec.outcome)
+	}
+	if rec.callErr != "dial tcp: connection refused" {
+		t.Errorf("callErr = %q, want the transport error preserved", rec.callErr)
+	}
+}
+
+// TestBuildRecordResultExtractorEnrichesNon2xx checks a provider message is
+// captured even when the HTTP status already signalled failure.
+func TestBuildRecordResultExtractorEnrichesNon2xx(t *testing.T) {
+	extractor := func(int, []byte) (bool, string) { return true, "insufficient float" }
+	c := newCapture(NewConfig("magma", WithCaptureBodies(true), WithResultExtractor(extractor)), "inst")
+
+	req, err := http.NewRequest(http.MethodPost, "http://magma/v1/payout/transfer", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp := &http.Response{StatusCode: 503, Header: http.Header{"Content-Type": {"application/json"}}}
+	rec := c.buildRecord(exchange{req: req, resp: resp, respBody: []byte(`{"code":503}`)})
+
+	if rec.outcome != outcomeProviderError {
+		t.Errorf("outcome = %q, want provider_error", rec.outcome)
+	}
+	if rec.callErr != "insufficient float" {
+		t.Errorf("callErr = %q, want the provider message on a non-2xx too", rec.callErr)
+	}
+}

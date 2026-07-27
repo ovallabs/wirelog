@@ -99,6 +99,15 @@ func (c *capture) buildRecord(x exchange) record {
 	if x.err != nil {
 		rec.callErr = x.err.Error()
 	}
+	// A provider that answers 2xx and signals failure in the body gets the
+	// final say on outcome; it reads the unmasked body, which is nil when
+	// bodies are not captured.
+	if x.err == nil && x.resp != nil && c.cfg.ResultExtractor != nil {
+		if failed, message := c.cfg.ResultExtractor(x.resp.StatusCode, x.respBody); failed {
+			rec.outcome = outcomeProviderError
+			rec.callErr = message
+		}
+	}
 	return rec
 }
 

@@ -89,8 +89,8 @@ func remoteIPFrom(stored any) string {
 }
 
 // enqueueRecord builds and enqueues the record for one exchange. It recovers
-// from panicking user callbacks (Masker, PathNormalizer) so capture can never
-// fail the provider call; the abandoned record is counted as dropped.
+// from panicking user callbacks (Masker, PathNormalizer, ResultExtractor) so
+// capture can never fail the provider call; the abandoned record is counted as dropped.
 func (t *transport) enqueueRecord(x exchange) {
 	defer func() {
 		if recovered := recover(); recovered != nil {

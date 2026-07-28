@@ -19,15 +19,16 @@ type ResultExtractor func(statusCode int, body []byte) (failed bool, message str
 // once HTTPClient or WrapTransport mints a transport from it; never mutate it
 // afterwards.
 type Config struct {
-	Provider       string
-	Consumer       string
-	CaptureBodies  bool
-	MaxBodyBytes   int // default 16384
-	MaskFields     []string
-	DenyHeaders    []string
-	Masker         Masker
-	SkipBodyPaths  []string            // substring match on req.URL.Path only: metadata+sizes, never bodies
-	ExcludePaths   []string            // substring match on req.URL.Path only: no record at all
+	Provider        string
+	Consumer        string
+	CaptureBodies   bool
+	MaxBodyBytes    int // default 16384
+	MaskFields      []string
+	DenyHeaders     []string
+	Masker          Masker
+	RefFields       []string            // request body fields checked, in order, for the caller's reference
+	SkipBodyPaths   []string            // substring match on req.URL.Path only: metadata+sizes, never bodies
+	ExcludePaths    []string            // substring match on req.URL.Path only: no record at all
 	PathNormalizer  func(string) string // default DefaultNormalizer
 	ResultExtractor ResultExtractor     // optional; classifies 2xx-with-error-body responses
 }

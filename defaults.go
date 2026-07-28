@@ -27,6 +27,7 @@ func NewConfig(provider string, opts ...ConfigOption) Config {
 		Provider:       provider,
 		MaxBodyBytes:   defaultMaxBodyBytes,
 		MaskFields:     append([]string(nil), defaultMaskFields...),
+		RefFields:      append([]string(nil), defaultRefFields...),
 		SkipBodyPaths:  append([]string(nil), defaultSkipBodyPaths...),
 		ExcludePaths:   append([]string(nil), defaultExcludePaths...),
 		PathNormalizer: DefaultNormalizer,
@@ -45,6 +46,12 @@ func WithExtraMaskFields(f ...string) ConfigOption {
 // WithCaptureBodies toggles body capture.
 func WithCaptureBodies(b bool) ConfigOption {
 	return func(c *Config) { c.CaptureBodies = b }
+}
+
+// WithExtraRefFields appends request body field names checked for the caller's
+// reference, on top of the shared list.
+func WithExtraRefFields(f ...string) ConfigOption {
+	return func(c *Config) { c.RefFields = append(c.RefFields, f...) }
 }
 
 // WithExtraDenyHeaders appends header names always masked, on top of the built-in auth denylist.

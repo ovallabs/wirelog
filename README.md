@@ -210,6 +210,26 @@ Consumer precedence is `WithConsumer(ctx)` > `Config.Consumer` >
 `WithDefaultConsumer`. `WithTags` shallow-merges across calls (last write wins
 per key); repeated `WithOperation` — last wins.
 
+#### Reference and idempotency key are inferred
+
+`WithRef` and `WithIdempotencyKey` are **optional**. When they are not set,
+wirelog reads both off the request itself, so a consuming service does not have
+to import wirelog just to supply them:
+
+- **Reference** — the first match from `Config.RefFields` in the JSON request
+  body (`reference`, `merchant_transaction_id`, `transaction_reference`,
+  `client_reference`, …). Matching is canonicalised, so `merchantTransactionId`
+  matches `merchant_transaction_id`. Extend per provider with
+  `WithExtraRefFields("txnRef")`.
+- **Idempotency key** — the first of `Idempotency-Key`, `X-Idempotency-Key` or
+  `X-Anchor-Idempotent-Key` present on the request.
+
+An explicit annotation always wins, so callers that already set them are
+unaffected.
+
+> Body inference needs `WithCaptureBodies(true)` — with bodies off there is no
+> body to read. Header-based idempotency works either way.
+
 #### Operations are a shared vocabulary
 
 `Operation` is a canonical enum, not free text, so `operation` means the same

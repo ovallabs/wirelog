@@ -309,7 +309,7 @@ no-op, so a wirelog init failure leaves request serving untouched.
 | `provider` | the service name (`zobo-be`, `vban-be`) |
 | `consumer` | the client app / platform (`ios`, `android`, `web`) |
 | `operation` | the business action, via `WithOperation` |
-| `endpoint` | the matched route template (`/v1/wallet/{id}`) |
+| `endpoint` | the matched route template (`/v1/wallet/:id`, from gin's `c.FullPath()`) |
 | `internal_ref` | user / customer id, via `WithRef` |
 
 > **Privacy: bodies default off.** Inbound requests carry customer credentials

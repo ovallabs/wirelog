@@ -1,7 +1,6 @@
-// inbound.go — the receiving dock: records each request arriving from the app,
-// reusing the same redaction desk (masking) and archive (writer) as the
-// outbound window, but observed by a server-side middleware instead of a
-// transport.
+// inbound.go — the receiving dock: records each request arriving from the app.
+// It reuses the same masking, queue, writer and pool as outbound capture, but
+// is observed by a server-side middleware instead of an http.RoundTripper.
 
 package wirelog
 

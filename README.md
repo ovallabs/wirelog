@@ -34,6 +34,7 @@ counted.
   - [3. Providers with their own transport (proxy, custom TLS)](#3-providers-with-their-own-transport-proxy-custom-tls)
   - [4. Annotate calls with business context](#4-annotate-calls-with-business-context)
   - [5. Shut down cleanly](#5-shut-down-cleanly)
+- [Inbound request logging](#inbound-request-logging)
 - [What gets masked](#what-gets-masked)
 - [Outcome classification](#outcome-classification)
 - [Configuration reference](#configuration-reference)
@@ -262,6 +263,63 @@ receiver and safe to call more than once.
 
 ---
 
+## Inbound request logging
+
+The same instance can record requests coming **in** to your service, not just
+calls going **out** to providers. Instead of wrapping an HTTP client, mint an
+`InboundCapturer` and call it from a server-side middleware. It reuses the same
+masking, queue, writer and pool — only the observation point differs — and
+writes to the **same `provider_api_logs` schema**, so point its instance at a
+separate database (a different DSN) to keep inbound rows isolated from provider
+rows.
+
+```go
+// one capturer per service, minted from the same Config type
+cap := wl.InboundCapturer(wirelog.NewConfig("zobo-be",
+    wirelog.WithDefaultConsumer("app"), // overridden per request by the client platform
+))
+
+// from your framework's middleware, after the handler has run:
+cap.Log(wirelog.InboundExchange{
+    Ctx:             c.Request.Context(), // carries WithRef/WithOperation/... annotations
+    Method:          c.Request.Method,
+    Route:           c.FullPath(),        // matched route template → endpoint
+    Path:            c.Request.URL.Path,  // raw path
+    StatusCode:      c.Writer.Status(),
+    Latency:         time.Since(start),
+    RequestHeaders:  c.Request.Header,
+    ResponseHeaders: c.Writer.Header(),
+    RequestSize:     c.Request.ContentLength,
+    ResponseSize:    int64(c.Writer.Size()),
+    RemoteIP:        c.ClientIP(),
+    Error:           c.Errors.String(), // optional: failure reason for the error column
+    // RequestBody/ResponseBody: leave nil unless you deliberately capture bodies
+})
+```
+
+`Log` never blocks or fails the request: excluded paths produce no record, a
+full buffer drops-and-counts (via `Dropped()`), and a panicking `Masker` or
+`PathNormalizer` is recovered. A capturer minted from a `nil *Wirelog` is a
+no-op, so a wirelog init failure leaves request serving untouched.
+
+**Column meanings shift** for inbound (same columns, reinterpreted):
+
+| Column | Inbound meaning |
+|---|---|
+| `provider` | the service name (`zobo-be`, `vban-be`) |
+| `consumer` | the client app / platform (`ios`, `android`, `web`) |
+| `operation` | the business action, via `WithOperation` |
+| `endpoint` | the matched route template (`/v1/wallet/:id`, from gin's `c.FullPath()`) |
+| `internal_ref` | user / customer id, via `WithRef` |
+
+> **Privacy: bodies default off.** Inbound requests carry customer credentials
+> and PII, so capture records **metadata and sizes only** unless you set
+> `WithCaptureBodies(true)`. Turn bodies on deliberately, per endpoint, with an
+> app-specific mask list, and keep auth/session routes in `SkipBodyPaths`.
+> Sizes are always recorded, even with bodies off.
+
+---
+
 ## What gets masked
 
 Masking happens **inside `RoundTrip`, before the record is queued** — the
@@ -309,7 +367,8 @@ parsing; a body that isn't valid JSON (or was cut mid-token) is stored as
 
 ## Outcome classification
 
-Every record carries an `outcome`, derived from the response or error:
+Every record carries an `outcome`. **Outbound** calls derive it from the
+response or error:
 
 | Outcome | When |
 |---|---|
@@ -317,6 +376,15 @@ Every record carries an `outcome`, derived from the response or error:
 | `provider_error` | response with a non-2xx status |
 | `timeout` | `context.DeadlineExceeded`, or a `net.Error` with `Timeout() == true` (including when wrapped in `*url.Error`) |
 | `network` | any other transport error (connection refused, DNS, reset, …) |
+
+**Inbound** requests use their own outcomes (the transport-error outcomes above
+have no inbound meaning):
+
+| Outcome | When |
+|---|---|
+| `success` | 2xx (or 3xx) response |
+| `client_error` | 4xx response |
+| `server_error` | 5xx response, or no response written |
 
 The error string is stored in the `error` column for the failure paths.
 

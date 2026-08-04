@@ -275,11 +275,15 @@ tables can share one database.
 
 ```go
 // build the instance for its own table (same schema, separate table)
-wl, _ := wirelog.New(ctx, dsn,
+wl, err := wirelog.New(ctx, dsn,
     wirelog.WithTable("inbound_api_logs"),
     wirelog.WithAutoMigrate(true),          // creates inbound_api_logs if absent
     wirelog.WithDefaultConsumer("app"),
 )
+if err != nil {
+    // handle it, or deliberately fall back to a nil *Wirelog —
+    // its capturers are no-ops, so capture is disabled but requests still serve
+}
 
 // one capturer per service, minted from the same Config type
 cap := wl.InboundCapturer(wirelog.NewConfig("zobo-be"))

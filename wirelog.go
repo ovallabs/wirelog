@@ -46,13 +46,13 @@ func New(ctx context.Context, dbURL string, opts ...Option) (*Wirelog, error) {
 	// pgxpool dials lazily, so ping once here to surface the target and network path in logs; never fatal
 	logConnectionStatus(ctx, pool, o.logger)
 	if o.autoMigrate {
-		if err := migrate(ctx, pool); err != nil {
+		if err := migrate(ctx, pool, o.table); err != nil {
 			pool.Close()
 			return nil, err
 		}
 	}
 	wl := &Wirelog{pool: pool, ch: make(chan record, o.buffer), opts: o}
-	wl.w = newWriter(wl.ch, &pgInserter{pool: pool}, o.batchSize, o.flushInterval, o.logger, &wl.dropped)
+	wl.w = newWriter(wl.ch, &pgInserter{pool: pool, table: o.table}, o.batchSize, o.flushInterval, o.logger, &wl.dropped)
 	go wl.w.run()
 	return wl, nil
 }

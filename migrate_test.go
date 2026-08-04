@@ -26,10 +26,10 @@ func (r *recordingExecer) Exec(_ context.Context, sql string, _ ...any) (pgconn.
 // a single Exec call.
 func TestMigrateExecutesEmbeddedDDLOnce(t *testing.T) {
 	db := &recordingExecer{}
-	if err := migrate(context.Background(), db); err != nil {
+	if err := migrate(context.Background(), db, defaultTable); err != nil {
 		t.Fatalf("migrate error: %v", err)
 	}
-	if len(db.sqls) != 1 || db.sqls[0] != schemaDDL {
+	if len(db.sqls) != 1 || db.sqls[0] != schemaDDL(defaultTable) {
 		t.Fatalf("migrate must execute the embedded DDL exactly once, got %d execs", len(db.sqls))
 	}
 }
@@ -39,7 +39,7 @@ func TestMigrateExecutesEmbeddedDDLOnce(t *testing.T) {
 func TestMigratePropagatesError(t *testing.T) {
 	sentinel := errors.New("permission denied")
 	db := &recordingExecer{err: sentinel}
-	if err := migrate(context.Background(), db); !errors.Is(err, sentinel) {
+	if err := migrate(context.Background(), db, defaultTable); !errors.Is(err, sentinel) {
 		t.Fatalf("migrate error = %v, want sentinel", err)
 	}
 }
@@ -72,16 +72,16 @@ func TestSchemaDDLMatchesFRD(t *testing.T) {
 		"response_body    jsonb",
 		"error            text",
 		"tags             jsonb",
-		"idx_pal_provider_time on provider_api_logs (provider, created_at desc)",
-		"idx_pal_consumer_time on provider_api_logs (consumer, created_at desc)",
-		"idx_pal_internal_ref  on provider_api_logs (internal_ref) where internal_ref is not null",
-		"idx_pal_idem_key      on provider_api_logs (idempotency_key) where idempotency_key is not null",
-		"idx_pal_failures      on provider_api_logs (created_at desc) where outcome <> 'success'",
-		"idx_pal_req_body_gin  on provider_api_logs using gin (request_body  jsonb_path_ops)",
-		"idx_pal_resp_body_gin on provider_api_logs using gin (response_body jsonb_path_ops)",
+		"idx_provider_api_logs_provider_time on provider_api_logs (provider, created_at desc)",
+		"idx_provider_api_logs_consumer_time on provider_api_logs (consumer, created_at desc)",
+		"idx_provider_api_logs_internal_ref  on provider_api_logs (internal_ref) where internal_ref is not null",
+		"idx_provider_api_logs_idem_key      on provider_api_logs (idempotency_key) where idempotency_key is not null",
+		"idx_provider_api_logs_failures      on provider_api_logs (created_at desc) where outcome <> 'success'",
+		"idx_provider_api_logs_req_body_gin  on provider_api_logs using gin (request_body  jsonb_path_ops)",
+		"idx_provider_api_logs_resp_body_gin on provider_api_logs using gin (response_body jsonb_path_ops)",
 	}
 	for _, want := range required {
-		if !strings.Contains(schemaDDL, want) {
+		if !strings.Contains(schemaDDL(defaultTable), want) {
 			t.Errorf("schemaDDL missing verbatim fragment: %q", want)
 		}
 	}

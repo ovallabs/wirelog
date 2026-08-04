@@ -163,7 +163,7 @@ func TestBuildInsertPlaceholdersAndNullMapping(t *testing.T) {
 	}
 	empty := record{provider: "magma", outcome: outcomeNetwork}
 
-	sql, args := buildInsert([]record{full, empty})
+	sql, args := buildInsert([]record{full, empty}, defaultTable)
 
 	if got := strings.Count(sql, "$"); got != 2*colCount {
 		t.Errorf("placeholder count = %d, want %d", got, 2*colCount)

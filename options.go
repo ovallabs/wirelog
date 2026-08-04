@@ -3,7 +3,10 @@
 
 package wirelog
 
-import "time"
+import (
+	"regexp"
+	"time"
+)
 
 // Option customises a Wirelog instance at construction.
 type Option func(*options)
@@ -16,6 +19,7 @@ type options struct {
 	logger        Logger
 	autoMigrate   bool
 	consumer      string
+	table         string
 }
 
 // defaultOptions returns the FRD instance defaults applied before user options.
@@ -25,8 +29,15 @@ func defaultOptions() options {
 		batchSize:     100,
 		flushInterval: 2 * time.Second,
 		logger:        nopLogger{},
+		table:         defaultTable,
 	}
 }
+
+// tableNamePattern validates a destination table identifier. A table name
+// cannot be a bind parameter, so it is interpolated into SQL — this pattern is
+// the injection guard. The length bound keeps derived index names within
+// Postgres's 63-character identifier limit.
+var tableNamePattern = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]{0,44}$`)
 
 // WithBuffer sets the enqueue channel capacity (default 2048); non-positive
 // values keep the default.
@@ -78,4 +89,17 @@ func WithAutoMigrate(b bool) Option {
 // rung of the consumer precedence chain.
 func WithDefaultConsumer(c string) Option {
 	return func(o *options) { o.consumer = c }
+}
+
+// WithTable sets the destination table (default "provider_api_logs"), letting
+// one database hold more than one wirelog table — e.g. a separate
+// "inbound_api_logs" for inbound request capture. The name is validated as a
+// safe SQL identifier; an invalid name is ignored so a misconfiguration keeps
+// the default rather than yielding injectable SQL.
+func WithTable(name string) Option {
+	return func(o *options) {
+		if tableNamePattern.MatchString(name) {
+			o.table = name
+		}
+	}
 }

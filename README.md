@@ -268,16 +268,21 @@ receiver and safe to call more than once.
 The same instance can record requests coming **in** to your service, not just
 calls going **out** to providers. Instead of wrapping an HTTP client, mint an
 `InboundCapturer` and call it from a server-side middleware. It reuses the same
-masking, queue, writer and pool — only the observation point differs — and
-writes to the **same `provider_api_logs` schema**, so point its instance at a
-separate database (a different DSN) to keep inbound rows isolated from provider
-rows.
+masking, queue, writer and pool — only the observation point differs. It writes
+the **same schema**, so give the instance its own table with `WithTable` (e.g.
+`inbound_api_logs`) to keep inbound rows isolated from provider rows — the two
+tables can share one database.
 
 ```go
+// build the instance for its own table (same schema, separate table)
+wl, _ := wirelog.New(ctx, dsn,
+    wirelog.WithTable("inbound_api_logs"),
+    wirelog.WithAutoMigrate(true),          // creates inbound_api_logs if absent
+    wirelog.WithDefaultConsumer("app"),
+)
+
 // one capturer per service, minted from the same Config type
-cap := wl.InboundCapturer(wirelog.NewConfig("zobo-be",
-    wirelog.WithDefaultConsumer("app"), // overridden per request by the client platform
-))
+cap := wl.InboundCapturer(wirelog.NewConfig("zobo-be"))
 
 // from your framework's middleware, after the handler has run:
 cap.Log(wirelog.InboundExchange{
@@ -408,6 +413,7 @@ The error string is stored in the `error` column for the failure paths.
 | `WithLogger(l)` | silent no-op | one line for startup connection status (success or failure), then one per failed batch insert |
 | `WithAutoMigrate(b)` | false | apply the embedded DDL during `New` |
 | `WithDefaultConsumer(c)` | "" | consumer stamped on every record unless overridden |
+| `WithTable(name)` | `provider_api_logs` | destination table; lets one DB hold more than one wirelog table (e.g. a separate `inbound_api_logs`). Validated as a SQL identifier; invalid names keep the default |
 
 **Provider config** (`wirelog.NewConfig(provider, ...)`):
 

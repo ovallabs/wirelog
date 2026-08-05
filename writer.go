@@ -105,11 +105,14 @@ func (w *writer) closeAndDrain() {
 }
 
 // pgInserter delivers batches to Postgres with one multi-row INSERT.
-type pgInserter struct{ pool *pgxpool.Pool }
+type pgInserter struct {
+	pool  *pgxpool.Pool
+	table string
+}
 
 // insertBatch executes the rendered multi-row INSERT for one batch.
 func (p *pgInserter) insertBatch(ctx context.Context, records []record) error {
-	insertSQL, args := buildInsert(records)
+	insertSQL, args := buildInsert(records, p.table)
 	_, err := p.pool.Exec(ctx, insertSQL, args...)
 	return err
 }
@@ -130,11 +133,12 @@ const maxBatchSize = 3000
 // driver never has to guess the parameter type.
 var jsonbCols = map[int]bool{15: true, 16: true, 17: true, 18: true, 20: true}
 
-// buildInsert renders one multi-row INSERT using numbered placeholders only;
-// record values are never interpolated into the SQL.
-func buildInsert(records []record) (string, []any) {
+// buildInsert renders one multi-row INSERT into table using numbered
+// placeholders only; record values are never interpolated into the SQL. table
+// is a validated identifier (see WithTable), so interpolating it is safe.
+func buildInsert(records []record, table string) (string, []any) {
 	var query strings.Builder
-	query.WriteString("insert into provider_api_logs (" + insertColumns + ") values ")
+	query.WriteString("insert into " + table + " (" + insertColumns + ") values ")
 	args := make([]any, 0, len(records)*colCount)
 	for i, rec := range records {
 		if i > 0 {

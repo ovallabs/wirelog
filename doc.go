@@ -43,8 +43,9 @@
 //
 // The writer (writer.go) is the mail van: a single goroutine that leaves
 // when full or on schedule — flushing at batch size or flush interval — and
-// delivers batches of records to the archive, the Postgres table
-// provider_api_logs. Close drains the slot, makes one final delivery, then
+// delivers batches of records to the archive, the configured Postgres table
+// (provider_api_logs by default; set another with WithTable, e.g. a separate
+// inbound_api_logs). Close drains the slot, makes one final delivery, then
 // parks the van: the goroutine exits and the connection pool closes.
 // Dropped also counts records lost when a delivery fails (a failed batch
 // insert).

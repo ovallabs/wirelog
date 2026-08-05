@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-// record mirrors one provider_api_logs row; jsonb columns hold masked copies.
+// record mirrors one api-log row (the configured table, provider_api_logs by
+// default); jsonb columns hold masked copies.
 type record struct {
 	provider        string
 	consumer        string

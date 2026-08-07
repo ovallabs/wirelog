@@ -24,4 +24,6 @@ const (
 	OperationMethodsLookup Operation = "methods_lookup"
 	// OperationExchangeRate quotes an FX rate.
 	OperationExchangeRate Operation = "exchange_rate"
+	// OperationAuthentication obtains or refreshes provider credentials.
+	OperationAuthentication Operation = "authentication"
 )

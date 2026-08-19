@@ -269,3 +269,21 @@ func TestMaskBodyUnmarshalableMaskerResultRemasks(t *testing.T) {
 		t.Errorf("msisdn = %v, want constant-masked fallback, never raw", v["msisdn"])
 	}
 }
+
+// TestMaskBodyCanonicalisesFieldNames confirms snake_case mask fields also mask
+// camelCase and kebab-case spellings of the same key.
+func TestMaskBodyCanonicalisesFieldNames(t *testing.T) {
+	fields := maskFieldSet([]string{"account_number", "access_token", "first_name"})
+	body := []byte(`{"accountNumber":"123","access-token":"t","AccessToken":"t2","firstName":"jane","note":"keep"}`)
+
+	out := string(maskBody(body, 1<<20, fields, nil, "application/json"))
+
+	for _, redacted := range []string{`"accountNumber":"` + maskedValue, `"access-token":"` + maskedValue, `"AccessToken":"` + maskedValue, `"firstName":"` + maskedValue} {
+		if !strings.Contains(out, redacted) {
+			t.Errorf("expected %q masked in: %s", redacted, out)
+		}
+	}
+	if !strings.Contains(out, `"note":"keep"`) {
+		t.Errorf("non-sensitive field wrongly masked: %s", out)
+	}
+}

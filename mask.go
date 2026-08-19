@@ -33,11 +33,13 @@ func denyHeaderSet(extra []string) map[string]struct{} {
 	return deny
 }
 
-// maskFieldSet lowercases Config.MaskFields into a lookup set, built once per mint.
+// maskFieldSet canonicalises Config.MaskFields into a lookup set, built once per
+// mint. Canonicalising (lowercase, separators stripped) makes snake_case,
+// camelCase and kebab-case spellings of a field compare equal.
 func maskFieldSet(fields []string) map[string]struct{} {
 	set := make(map[string]struct{}, len(fields))
 	for _, f := range fields {
-		set[strings.ToLower(f)] = struct{}{}
+		set[canonicalFieldName(f)] = struct{}{}
 	}
 	return set
 }
@@ -103,7 +105,7 @@ func maskForm(body []byte, fields map[string]struct{}) (map[string]any, bool) {
 	}
 	form := make(map[string]any, len(values))
 	for key, vals := range values {
-		if _, matched := fields[strings.ToLower(key)]; matched {
+		if _, matched := fields[canonicalFieldName(key)]; matched {
 			form[key] = maskedValue
 			continue
 		}
@@ -143,10 +145,9 @@ func maskWalk(value any, fields map[string]struct{}, masker Masker) any {
 	switch node := value.(type) {
 	case map[string]any:
 		for key, child := range node {
-			lowerKey := strings.ToLower(key)
-			if _, matched := fields[lowerKey]; matched {
+			if _, matched := fields[canonicalFieldName(key)]; matched {
 				if masker != nil {
-					node[key] = masker(lowerKey, child)
+					node[key] = masker(strings.ToLower(key), child)
 				} else {
 					node[key] = maskedValue
 				}

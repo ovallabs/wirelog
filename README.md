@@ -362,9 +362,10 @@ email  receiver_account  receiver_account_number  sender_phone_number
 ```
 
 Extend it per provider with `WithExtraMaskFields(...)` (it **appends**, never
-replaces). Keys are matched **exactly** (case-insensitively) — `first_name`
-does not match `receiver_first_name`, so add provider-specific variants
-explicitly. Bodies are truncated to `MaxBodyBytes` (default 16384) **before**
+replaces). Keys are matched **canonically** — case-insensitive with separators
+stripped — so `account_number` also masks `accountNumber` and `account-number`;
+a whole-word field like `first_name` still does not match `receiver_first_name`.
+Bodies are truncated to `MaxBodyBytes` (default 16384) **before**
 parsing; a body that isn't valid JSON (or was cut mid-token) is stored as
 `{"_raw": "…", "_truncated": true}`. Empty bodies become SQL NULL.
 

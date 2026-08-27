@@ -17,7 +17,10 @@ var defaultMaskFields = []string{
 
 var defaultSkipBodyPaths = []string{"/oauth", "/token", "/auth"}
 
-var defaultExcludePaths = []string{"/health", "/ping", "/status"}
+// "/status" is deliberately absent: paths match by substring, and provider APIs
+// commonly expose business endpoints such as /transfer/status, which would then
+// be dropped entirely. Add it via WithExtraExcludePaths where it is a health check.
+var defaultExcludePaths = []string{"/health", "/ping"}
 
 // NewConfig mints a provider Config with the shared defaults applied.
 // CaptureBodies never defaults true. Slices are copied so configs never

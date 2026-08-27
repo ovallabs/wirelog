@@ -417,3 +417,26 @@ func TestTransportConcurrentUse(t *testing.T) {
 		t.Errorf("records+dropped = %d, want %d", got, goroutines*perG)
 	}
 }
+
+// TestRoundTripBusinessStatusPathIsRecorded guards the regression where the default
+// exclude list contained "/status" and, matching by substring, silently dropped
+// provider business endpoints such as GatewayPayment's /transfer/status.
+func TestRoundTripBusinessStatusPathIsRecorded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":6007,"message":"The service needs a code"}`))
+	}))
+	defer srv.Close()
+
+	tr, ch, _ := newTestTransport(http.DefaultTransport, NewConfig("gatewaypayment", WithCaptureBodies(true)), "", 8)
+	resp, err := (&http.Client{Transport: tr}).Get(srv.URL + "/switch/api/enterprise/transfer/status?reference=abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	select {
+	case <-ch:
+	default:
+		t.Fatal("business /transfer/status path produced no record; it must not be excluded")
+	}
+}

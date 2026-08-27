@@ -32,7 +32,7 @@ func TestNewConfigDefaults(t *testing.T) {
 	if want := []string{"/oauth", "/token", "/auth"}; !reflect.DeepEqual(cfg.SkipBodyPaths, want) {
 		t.Errorf("SkipBodyPaths = %v, want %v", cfg.SkipBodyPaths, want)
 	}
-	if want := []string{"/health", "/ping", "/status"}; !reflect.DeepEqual(cfg.ExcludePaths, want) {
+	if want := []string{"/health", "/ping"}; !reflect.DeepEqual(cfg.ExcludePaths, want) {
 		t.Errorf("ExcludePaths = %v, want %v", cfg.ExcludePaths, want)
 	}
 	if cfg.PathNormalizer == nil {

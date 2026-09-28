@@ -27,6 +27,10 @@ type InboundExchange struct {
 	Route string
 	// Path is the raw request path as received.
 	Path string
+	// Query is the raw URL query string (RawQuery). Sensitive parameters are
+	// masked and appended to the stored path; the aggregated endpoint stays
+	// query-free.
+	Query string
 	// StatusCode is the response status written to the client; 0 when none was.
 	StatusCode int
 	// Latency is how long the handler took to produce the response.
@@ -120,7 +124,7 @@ func (c *capture) buildInboundRecord(x InboundExchange) record {
 		consumer:        resolveConsumer(ctx, c.cfg.Consumer, c.consumer),
 		operation:       string(operationFrom(ctx)),
 		endpoint:        c.inboundEndpoint(x),
-		path:            x.Path,
+		path:            pathWithQuery(x.Path, x.Query, c.fields),
 		method:          x.Method,
 		remoteIP:        x.RemoteIP,
 		statusCode:      x.StatusCode,
@@ -146,6 +150,17 @@ func (c *capture) inboundEndpoint(x InboundExchange) string {
 		return x.Route
 	}
 	return c.cfg.PathNormalizer(x.Path)
+}
+
+// pathWithQuery appends the masked query string to the raw path, capturing query
+// parameters for debugging without leaking sensitive values. An empty query
+// leaves the path untouched.
+func pathWithQuery(path, rawQuery string, fields map[string]struct{}) string {
+	masked := maskQuery(rawQuery, fields)
+	if masked == "" {
+		return path
+	}
+	return path + "?" + masked
 }
 
 // inboundSize prefers the explicit wire size the middleware reported and falls

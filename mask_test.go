@@ -287,3 +287,29 @@ func TestMaskBodyCanonicalisesFieldNames(t *testing.T) {
 		t.Errorf("non-sensitive field wrongly masked: %s", out)
 	}
 }
+
+// TestMaskQuery masks matched parameter values (canonically, any spelling),
+// preserves unmatched pairs and value-less flags, and leaves an empty query "".
+func TestMaskQuery(t *testing.T) {
+	fields := maskFieldSet([]string{"token", "access_token"})
+
+	if got := maskQuery("", fields); got != "" {
+		t.Errorf("empty query = %q, want empty", got)
+	}
+
+	got := maskQuery("page=2&token=abc123&accessToken=xyz&flag", fields)
+	for _, redacted := range []string{"token=" + maskedValue, "accessToken=" + maskedValue} {
+		if !strings.Contains(got, redacted) {
+			t.Errorf("expected %q in %q", redacted, got)
+		}
+	}
+	if !strings.Contains(got, "page=2") {
+		t.Errorf("non-sensitive param wrongly changed: %q", got)
+	}
+	if !strings.Contains(got, "flag") {
+		t.Errorf("value-less flag dropped: %q", got)
+	}
+	if strings.Contains(got, "abc123") || strings.Contains(got, "xyz") {
+		t.Errorf("sensitive value leaked: %q", got)
+	}
+}

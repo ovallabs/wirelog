@@ -118,6 +118,30 @@ func maskForm(body []byte, fields map[string]struct{}) (map[string]any, bool) {
 	return form, true
 }
 
+// maskQuery replaces the values of matched parameters in a raw URL query with
+// the mask constant, preserving the original key spelling and pair order for
+// readability; unmatched pairs and value-less flags pass through untouched.
+func maskQuery(rawQuery string, fields map[string]struct{}) string {
+	if rawQuery == "" {
+		return ""
+	}
+	pairs := strings.Split(rawQuery, "&")
+	for i, pair := range pairs {
+		key, _, found := strings.Cut(pair, "=")
+		if !found {
+			continue // a flag with no value: nothing to mask
+		}
+		name, err := url.QueryUnescape(key)
+		if err != nil {
+			name = key
+		}
+		if _, matched := fields[canonicalFieldName(name)]; matched {
+			pairs[i] = key + "=" + maskedValue
+		}
+	}
+	return strings.Join(pairs, "&")
+}
+
 // formWrap packages a masked form as valid JSON under "_form".
 func formWrap(form map[string]any, truncated bool) []byte {
 	wrapper := map[string]any{"_form": form}

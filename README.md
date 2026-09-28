@@ -292,8 +292,9 @@ cap := wl.InboundCapturer(wirelog.NewConfig("zobo-be"))
 cap.Log(wirelog.InboundExchange{
     Ctx:             c.Request.Context(), // carries WithRef/WithOperation/... annotations
     Method:          c.Request.Method,
-    Route:           c.FullPath(),        // matched route template → endpoint
-    Path:            c.Request.URL.Path,  // raw path
+    Route:           c.FullPath(),         // matched route template → endpoint
+    Path:            c.Request.URL.Path,   // raw path
+    Query:           c.Request.URL.RawQuery, // masked, then appended to path
     StatusCode:      c.Writer.Status(),
     Latency:         time.Since(start),
     RequestHeaders:  c.Request.Header,
@@ -319,6 +320,7 @@ no-op, so a wirelog init failure leaves request serving untouched.
 | `consumer` | the client app / platform (`ios`, `android`, `web`) |
 | `operation` | the business action, via `WithOperation` |
 | `endpoint` | the matched route template (`/v1/wallet/:id`, from gin's `c.FullPath()`) |
+| `path` | the raw path, with the masked query string appended (`/v1/wallet/8f3a?token=•••`) |
 | `internal_ref` | user / customer id, via `WithRef` |
 
 > **Privacy: bodies default off.** Inbound requests carry customer credentials

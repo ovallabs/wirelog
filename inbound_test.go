@@ -175,6 +175,35 @@ func TestBuildInboundRecordSkipBodyPaths(t *testing.T) {
 	}
 }
 
+// TestBuildInboundRecordQuery folds the masked query into path, redacting
+// matched params while the endpoint stays query-free for aggregation.
+func TestBuildInboundRecordQuery(t *testing.T) {
+	c := newCapture(NewConfig("zobo-be", WithExtraMaskFields("token")), "ios")
+	x := newInboundExchange(context.Background())
+	x.Query = "page=2&token=secret"
+
+	rec := c.buildInboundRecord(x)
+
+	if rec.path != "/v1/wallet/8f3a/withdraw?page=2&token="+maskedValue {
+		t.Errorf("path = %q, want query appended with token masked", rec.path)
+	}
+	if rec.endpoint != "/v1/wallet/:id/withdraw" {
+		t.Errorf("endpoint = %q, want query-free route template", rec.endpoint)
+	}
+	if strings.Contains(rec.path, "secret") {
+		t.Errorf("query secret leaked in path: %q", rec.path)
+	}
+}
+
+// TestBuildInboundRecordNoQuery leaves the path untouched when there is no query.
+func TestBuildInboundRecordNoQuery(t *testing.T) {
+	c := newCapture(NewConfig("zobo-be"), "ios")
+	rec := c.buildInboundRecord(newInboundExchange(context.Background()))
+	if rec.path != "/v1/wallet/8f3a/withdraw" {
+		t.Errorf("path = %q, want raw path unchanged", rec.path)
+	}
+}
+
 // TestInboundEndpointFallback normalizes the raw path when no route template is set.
 func TestInboundEndpointFallback(t *testing.T) {
 	c := newCapture(NewConfig("zobo-be"), "")
